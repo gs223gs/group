@@ -1,8 +1,11 @@
 // 参加者データを格納する配列
 let participants = [];
 
-// 参加者を追加する関数
-function addParticipant() {
+// 編集中の参加者のインデックス
+let editingIndex = null;
+
+// 参加者を追加または編集する関数
+function addOrEditParticipant() {
     const nameInput = document.getElementById('name-input');
     const genderInput = document.getElementById('gender-input');
 
@@ -14,9 +17,17 @@ function addParticipant() {
         return;
     }
 
-    participants.push({ name, gender });
-    nameInput.value = '';
+    if (editingIndex !== null) {
+        // 編集モード
+        participants[editingIndex] = { name, gender };
+        editingIndex = null;
+        document.getElementById('add-button').textContent = '追加';
+    } else {
+        // 新規追加
+        participants.push({ name, gender });
+    }
 
+    nameInput.value = '';
     updateParticipantTable();
 }
 
@@ -25,18 +36,50 @@ function updateParticipantTable() {
     const tbody = document.querySelector('#participant-table tbody');
     tbody.innerHTML = '';
 
-    participants.forEach((participant) => {
+    participants.forEach((participant, index) => {
         const tr = document.createElement('tr');
         const nameTd = document.createElement('td');
         const genderTd = document.createElement('td');
+        const actionTd = document.createElement('td');
 
         nameTd.textContent = participant.name;
         genderTd.textContent = participant.gender === 'male' ? '男の子' : '女の子';
 
+        // 編集ボタン
+        const editButton = document.createElement('button');
+        editButton.textContent = '編集';
+        editButton.classList.add('edit-button');
+        editButton.addEventListener('click', () => editParticipant(index));
+
+        // 削除ボタン
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = '削除';
+        deleteButton.classList.add('delete-button');
+        deleteButton.addEventListener('click', () => deleteParticipant(index));
+
+        actionTd.appendChild(editButton);
+        actionTd.appendChild(deleteButton);
+
         tr.appendChild(nameTd);
         tr.appendChild(genderTd);
+        tr.appendChild(actionTd);
         tbody.appendChild(tr);
     });
+}
+
+// 参加者を編集する関数
+function editParticipant(index) {
+    const participant = participants[index];
+    document.getElementById('name-input').value = participant.name;
+    document.getElementById('gender-input').value = participant.gender;
+    editingIndex = index;
+    document.getElementById('add-button').textContent = '更新';
+}
+
+// 参加者を削除する関数
+function deleteParticipant(index) {
+    participants.splice(index, 1);
+    updateParticipantTable();
 }
 
 // 順番を決める関数
@@ -74,11 +117,11 @@ function shuffleArray(array) {
 
 // グループ分けをする関数
 function divideGroups() {
-    const groupSizeInput = document.getElementById('group-size');
-    const groupSize = parseInt(groupSizeInput.value);
+    const groupNumberInput = document.getElementById('group-number');
+    const groupNumber = parseInt(groupNumberInput.value);
 
-    if (groupSize < 2) {
-        alert('グループの人数は2人以上にしてください。');
+    if (groupNumber < 1) {
+        alert('グループの数は1以上にしてください。');
         return;
     }
 
@@ -93,41 +136,25 @@ function divideGroups() {
     shuffleArray(males);
     shuffleArray(females);
 
-    const totalParticipants = participants.length;
-    const totalGroups = Math.ceil(totalParticipants / groupSize);
-
     // グループ配列を作成
-    const groups = Array.from({ length: totalGroups }, () => []);
+    const groups = Array.from({ length: groupNumber }, () => []);
 
-    let maleIndex = 0;
-    let femaleIndex = 0;
+    // 参加者をグループに割り当てる
+    let index = 0;
+    while (males.length > 0 || females.length > 0) {
+        const currentGroup = groups[index % groupNumber];
+        const maleCount = currentGroup.filter(p => p.gender === 'male').length;
+        const femaleCount = currentGroup.filter(p => p.gender === 'female').length;
 
-    // グループに参加者を割り当てる
-    for (let i = 0; i < totalGroups; i++) {
-        while (groups[i].length < groupSize && (maleIndex < males.length || femaleIndex < females.length)) {
-            const currentGroup = groups[i];
-            const maleCount = currentGroup.filter(p => p.gender === 'male').length;
-            const femaleCount = currentGroup.filter(p => p.gender === 'female').length;
-
-            // 女の子が半数以上にならないようにする
-            if (femaleCount < Math.floor(groupSize / 2) && femaleIndex < females.length) {
-                currentGroup.push(females[femaleIndex++]);
-            } else if (maleIndex < males.length) {
-                currentGroup.push(males[maleIndex++]);
-            } else if (femaleIndex < females.length) {
-                currentGroup.push(females[femaleIndex++]);
-            } else {
-                break;
-            }
+        // 女の子が半数以上にならないようにする
+        if (femaleCount < Math.floor((currentGroup.length + 1) / 2) && females.length > 0) {
+            currentGroup.push(females.pop());
+        } else if (males.length > 0) {
+            currentGroup.push(males.pop());
+        } else if (females.length > 0) {
+            currentGroup.push(females.pop());
         }
-    }
-
-    // 余りを最後のグループに追加
-    while (maleIndex < males.length) {
-        groups[groups.length - 1].push(males[maleIndex++]);
-    }
-    while (femaleIndex < females.length) {
-        groups[groups.length - 1].push(females[femaleIndex++]);
+        index++;
     }
 
     // グループを表示
@@ -159,7 +186,14 @@ function divideGroups() {
     });
 }
 
+// エンターキーで参加者を追加する機能
+document.getElementById('name-input').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        addOrEditParticipant();
+    }
+});
+
 // イベントリスナーの設定
-document.getElementById('add-button').addEventListener('click', addParticipant);
+document.getElementById('add-button').addEventListener('click', addOrEditParticipant);
 document.getElementById('decide-order-button').addEventListener('click', decideOrder);
 document.getElementById('divide-group-button').addEventListener('click', divideGroups);

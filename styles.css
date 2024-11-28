@@ -43,7 +43,6 @@ button {
     margin-bottom: 10px;
 }
 
-.toggle-button {
-    display: inline-block;
-    margin-left: 10px;
+.edit-button, .delete-button {
+    margin: 0 5px;
 }
