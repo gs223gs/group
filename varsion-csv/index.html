@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>CSV管理ツール</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h2 {
+            margin-top: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #cccccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        .group {
+            margin-top: 10px;
+        }
+        .group-table {
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        .error {
+            color: red;
+        }
+        button {
+            padding: 8px 12px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CSV管理ツール</h1>
+
+    <div class="section" id="file-section">
+        <h2>1. CSVファイルを選択</h2>
+        <input type="file" id="csv-files" accept=".csv" multiple>
+        <div id="file-error" class="error"></div>
+        <div class="controls">
+            <label for="csv-select">表示するCSVファイルを選択:</label>
+            <select id="csv-select">
+                <option value="">-- 選択してください --</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section" id="table-section" class="hidden">
+        <h2>2. 人員一覧</h2>
+        <table id="people-table">
+            <thead>
+                <tr>
+                    <th>選択</th>
+                    <th>名前</th>
+                    <th>性別</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- データがここに挿入されます -->
+            </tbody>
+        </table>
+        <button id="delete-absent">欠席の人を削除</button>
+    </div>
+
+    <div class="section" id="order-section">
+        <h2>3. 順番決め</h2>
+        <button id="determine-order">順番を決める</button>
+        <table id="order-table" class="hidden">
+            <thead>
+                <tr>
+                    <th>順番</th>
+                    <th>名前</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 順番がここに挿入されます -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section" id="group-section">
+        <h2>4. グループ分け</h2>
+        <div class="controls">
+            <label for="group-size">グループの人数:</label>
+            <input type="number" id="group-size" min="1" value="3">
+            <button id="assign-groups">グループを割り当てる</button>
+        </div>
+        <div id="group-error" class="error"></div>
+        <div id="groups-container">
+            <!-- グループがここに挿入されます -->
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let csvData = {}; // ファイル名をキー、データを値として保持
+
+        // 要素の取得
+        const csvFilesInput = document.getElementById('csv-files');
+        const csvSelect = document.getElementById('csv-select');
+        const fileError = document.getElementById('file-error');
+        const tableSection = document.getElementById('table-section');
+        const peopleTableBody = document.getElementById('people-table').querySelector('tbody');
+        const deleteAbsentButton = document.getElementById('delete-absent');
+        const determineOrderButton = document.getElementById('determine-order');
+        const orderTable = document.getElementById('order-table');
+        const orderTableBody = document.getElementById('order-table').querySelector('tbody');
+        const groupSizeInput = document.getElementById('group-size');
+        const assignGroupsButton = document.getElementById('assign-groups');
+        const groupsContainer = document.getElementById('groups-container');
+        const groupError = document.getElementById('group-error');
+
+        // イベントリスナー
+        csvFilesInput.addEventListener('change', handleFileSelect);
+        csvSelect.addEventListener('change', handleCSVSelect);
+        deleteAbsentButton.addEventListener('click', deleteAbsent);
+        determineOrderButton.addEventListener('click', determineOrder);
+        assignGroupsButton.addEventListener('click', assignGroups);
+
+        // ファイル選択時の処理
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length === 0) {
+                fileError.textContent = 'CSVファイルを選択してください。';
+                return;
+            }
+            fileError.textContent = '';
+            csvSelect.innerHTML = '<option value="">-- 選択してください --</option>';
+            csvData = {}; // リセット
+            Array.from(files).forEach(file => {
+                if (file.name.endsWith('.csv')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const text = e.target.result;
+                        const data = parseCSV(text);
+                        csvData[file.name] = data;
+                        const option = document.createElement('option');
+                        option.value = file.name;
+                        option.textContent = file.name;
+                        csvSelect.appendChild(option);
+                    };
+                    reader.readAsText(file);
+                }
+            });
+        }
+
+        // CSV選択時の処理
+        function handleCSVSelect(event) {
+            const selectedFile = event.target.value;
+            if (selectedFile && csvData[selectedFile]) {
+                displayPeople(csvData[selectedFile]);
+                tableSection.classList.remove('hidden');
+                orderTable.classList.add('hidden');
+                groupsContainer.innerHTML = '';
+            } else {
+                tableSection.classList.add('hidden');
+            }
+        }
+
+        // CSVパース関数
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const obj = {};
+                const currentLine = lines[i].split(',').map(item => item.trim());
+                headers.forEach((header, index) => {
+                    obj[header] = currentLine[index];
+                });
+                data.push(obj);
+            }
+            return data;
+        }
+
+        // 人員をテーブルに表示
+        function displayPeople(data) {
+            peopleTableBody.innerHTML = '';
+            data.forEach((person, index) => {
+                const row = document.createElement('tr');
+                
+                const selectCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.dataset.index = index;
+                selectCell.appendChild(checkbox);
+                row.appendChild(selectCell);
+                
+                const nameCell = document.createElement('td');
+                nameCell.textContent = person['名前'] || person['Name'] || 'N/A';
+                row.appendChild(nameCell);
+                
+                const genderCell = document.createElement('td');
+                genderCell.textContent = person['性別'] || person['Gender'] || 'N/A';
+                row.appendChild(genderCell);
+                
+                peopleTableBody.appendChild(row);
+            });
+        }
+
+        // 欠席の人を削除
+        function deleteAbsent() {
+            const selectedFile = csvSelect.value;
+            if (!selectedFile) {
+                alert('CSVファイルを選択してください。');
+                return;
+            }
+            const checkboxes = peopleTableBody.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                alert('削除する人を選択してください。');
+                return;
+            }
+            const indicesToDelete = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index)).sort((a, b) => b - a);
+            indicesToDelete.forEach(index => {
+                csvData[selectedFile].splice(index, 1);
+            });
+            displayPeople(csvData[selectedFile]);
+            orderTable.classList.add('hidden');
+            groupsContainer.innerHTML = '';
+        }
+
+        // 順番を決める
+        function determineOrder() {
+            const selectedFile = csvSelect.value;
+            if (!selectedFile) {
+                alert('CSVファイルを選択してください。');
+                return;
+            }
+            const data = [...csvData[selectedFile]];
+            // フィッシャー–イェーツのシャッフル
+            for (let i = data.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [data[i], data[j]] = [data[j], data[i]];
+            }
+            // 表示
+            orderTableBody.innerHTML = '';
+            data.forEach((person, index) => {
+                const row = document.createElement('tr');
+                const orderCell = document.createElement('td');
+                orderCell.textContent = index + 1;
+                row.appendChild(orderCell);
+                const nameCell = document.createElement('td');
+                nameCell.textContent = person['名前'] || person['Name'] || 'N/A';
+                row.appendChild(nameCell);
+                orderTableBody.appendChild(row);
+            });
+            orderTable.classList.remove('hidden');
+            groupsContainer.innerHTML = '';
+        }
+
+        // グループを割り当てる
+        function assignGroups() {
+            groupError.textContent = '';
+            const selectedFile = csvSelect.value;
+            if (!selectedFile) {
+                alert('CSVファイルを選択してください。');
+                return;
+            }
+            const data = [...csvData[selectedFile]];
+            if (data.length === 0) {
+                alert('参加者がいません。');
+                return;
+            }
+            const groupSize = parseInt(groupSizeInput.value);
+            if (isNaN(groupSize) || groupSize <= 0) {
+                groupError.textContent = '有効なグループサイズを入力してください。';
+                return;
+            }
+            // グループ分けのアルゴリズム
+            // 1. 性別で分ける
+            const males = data.filter(person => {
+                const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                return gender === '男' || gender === 'male' || gender === 'm';
+            });
+            const females = data.filter(person => {
+                const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                return gender === '女' || gender === 'female' || gender === 'f';
+            });
+            // 2. シャッフル
+            shuffleArray(males);
+            shuffleArray(females);
+            // 3. グループ数を決定
+            const total = data.length;
+            const groupsCount = Math.ceil(total / groupSize);
+            const groups = Array.from({ length: groupsCount }, () => []);
+            // 4. 男女交互にグループに割り当て
+            let m = 0, f = 0;
+            for (let i = 0; i < total; i++) {
+                const groupIndex = i % groupsCount;
+                if (m < males.length) {
+                    groups[groupIndex].push(males[m++]);
+                }
+                if (f < females.length) {
+                    groups[groupIndex].push(females[f++]);
+                }
+            }
+            // 5. 性別のバランスを確認し、必要に応じて調整
+            for (let group of groups) {
+                const girls = group.filter(person => {
+                    const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                    return gender === '女' || gender === 'female' || gender === 'f';
+                }).length;
+                if (girls > Math.floor(group.length / 2)) {
+                    // バランスが悪い場合、他のグループと交換
+                    for (let otherGroup of groups) {
+                        if (otherGroup === group) continue;
+                        const otherGirls = otherGroup.filter(person => {
+                            const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                            return gender === '女' || gender === 'female' || gender === 'f';
+                        }).length;
+                        if (otherGirls < Math.floor(otherGroup.length / 2)) {
+                            // 交換
+                            const girl = group.find(person => {
+                                const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                                return gender === '女' || gender === 'female' || gender === 'f';
+                            });
+                            const boy = otherGroup.find(person => {
+                                const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                                return gender === '男' || gender === 'male' || gender === 'm';
+                            });
+                            if (girl && boy) {
+                                // 交換
+                                const girlIndex = group.indexOf(girl);
+                                const boyIndex = otherGroup.indexOf(boy);
+                                [group[girlIndex], otherGroup[boyIndex]] = [otherGroup[boyIndex], group[girlIndex]];
+                            }
+                        }
+                        // 再度バランスを確認
+                        const newGirls = group.filter(person => {
+                            const gender = (person['性別'] || person['Gender'] || '').toLowerCase();
+                            return gender === '女' || gender === 'female' || gender === 'f';
+                        }).length;
+                        if (newGirls <= Math.floor(group.length / 2)) {
+                            break;
+                        }
+                    }
+                }
+            }
+            // 6. グループを表示
+            groupsContainer.innerHTML = '';
+            groups.forEach((group, index) => {
+                const groupDiv = document.createElement('div');
+                groupDiv.classList.add('group');
+                const groupTitle = document.createElement('h3');
+                groupTitle.textContent = `グループ ${index + 1}`;
+                groupDiv.appendChild(groupTitle);
+                const table = document.createElement('table');
+                table.classList.add('group-table');
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                const th1 = document.createElement('th');
+                th1.textContent = '名前';
+                headerRow.appendChild(th1);
+                const th2 = document.createElement('th');
+                th2.textContent = '性別';
+                headerRow.appendChild(th2);
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+                const tbody = document.createElement('tbody');
+                group.forEach(person => {
+                    const row = document.createElement('tr');
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = person['名前'] || person['Name'] || 'N/A';
+                    row.appendChild(nameCell);
+                    const genderCell = document.createElement('td');
+                    genderCell.textContent = person['性別'] || person['Gender'] || 'N/A';
+                    row.appendChild(genderCell);
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                groupDiv.appendChild(table);
+                groupsContainer.appendChild(groupDiv);
+            });
+        }
+
+        // 配列をシャッフルするヘルパー関数
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+    </script>
+
+</body>
+</html>
