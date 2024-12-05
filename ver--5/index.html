@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>CSV グループ分けツール</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>CSV グループ分けツール</h1>
+
+        <section id="file-section">
+            <h2>CSVファイルを選択</h2>
+            <input type="file" id="csv-files" accept=".csv" multiple>
+            <select id="csv-select">
+                <option value="">-- CSVファイルを選択 --</option>
+            </select>
+        </section>
+
+        <section id="table-section" class="hidden">
+            <h2>参加者一覧</h2>
+            <div class="table-wrapper">
+                <table id="participants-table">
+                    <thead>
+                        <tr>
+                            <th>名前</th>
+                            <th>性別</th>
+                            <th>欠席</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- データがここに挿入されます -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="save-attendance">欠席者を保存</button>
+        </section>
+
+        <section id="order-section" class="hidden">
+            <h2>順番決め</h2>
+            <button id="decide-order">順番を決める</button>
+            <div class="table-wrapper hidden">
+                <table id="order-table">
+                    <thead>
+                        <tr>
+                            <th>順番</th>
+                            <th>名前</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 順番データがここに挿入されます -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="group-section" class="hidden">
+            <h2>グループ分け</h2>
+            <div class="group-controls">
+                <label for="group-count">グループ数:</label>
+                <input type="number" id="group-count" min="1" value="2">
+                <button id="create-groups">グループを作成</button>
+            </div>
+            <div id="groups-display" class="groups-table-wrapper hidden">
+                <!-- グループ表示がここに挿入されます -->
+            </div>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

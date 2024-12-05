@@ -1,152 +1,48 @@
-/* リセットとベーシックスタイル */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html {
-    font-size: 16px;
-}
-
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #333;
-    line-height: 1.6;
-    background-color: #f0f2f5;
-    padding: 20px;
+    font-family: Arial, sans-serif;
+    margin: 20px;
 }
 
-.container {
-    max-width: 900px;
-    margin: 0 auto;
-    background-color: #ffffff;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+h1, h2 {
+    text-align: center;
 }
 
-h1, h2, h3 {
-    margin-bottom: 1rem;
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-section {
-    margin-bottom: 2rem;
-}
-
-.hidden {
-    display: none;
-}
-
-.table-wrapper {
-    overflow-x: auto;
-    margin-top: 1rem;
+#input-section, #participant-list, #order-section, #group-section {
+    margin-bottom: 30px;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 300px;
+    margin-top: 10px;
+}
+
+table, th, td {
+    border: 1px solid #333;
 }
 
 th, td {
-    border: 1px solid #ddd;
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    font-size: 0.9rem;
-}
-
-th {
-    background-color: #6d6d6d;
-    color: #ffffff;
-    position: sticky;
-    top: 0;
-}
-
-tr:nth-child(even) {
-    background-color: #f9f9f9;
-}
-
-tr:hover {
-    background-color: #f1f1f1;
+    padding: 8px;
+    text-align: center;
 }
 
 button {
-    display: inline-block;
-    background-color: #6d6d6d;
-    color: #fff;
-    border: none;
-    padding: 0.5rem 1rem;
-    margin-top: 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    font-size: 0.9rem;
+    padding: 8px 16px;
+    margin-left: 10px;
 }
 
-button:hover {
-    background-color: #2980b9;
+#group-result {
+    margin-top: 20px;
 }
 
-input[type="file"],
-select,
-input[type="number"] {
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.9rem;
+.group {
+    margin-bottom: 20px;
 }
 
-input[type="file"] {
-    margin-top: 0.5rem;
+.group h3 {
+    margin-bottom: 10px;
 }
 
-.group-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-}
-
-.group-controls label {
-    font-weight: 500;
-    color: #2c3e50;
-}
-
-.groups-table-wrapper {
-    margin-top: 1rem;
-}
-
-.group-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1.5rem;
-}
-
-.group-table th, .group-table td {
-    border: 1px solid #ddd;
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    font-size: 0.9rem;
-}
-
-.group-table th {
-    background-color: #6d6d6d;
-    color: #ffffff;
-}
-
-@media (max-width: 600px) {
-    .group-controls {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    button {
-        width: 100%;
-    }
+.edit-button, .delete-button {
+    margin: 0 5px;
 }
