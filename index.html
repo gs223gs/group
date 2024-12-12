@@ -2,349 +2,70 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>グループ分けアプリ</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h2 {
-            margin-top: 40px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid #cccccc;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .absent {
-            background-color: #ffdddd;
-        }
-        .button-group {
-            margin-top: 20px;
-        }
-        button {
-            padding: 10px 15px;
-            margin-right: 10px;
-            cursor: pointer;
-        }
-        .group {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #cccccc;
-            border-radius: 5px;
-        }
-        .group h3 {
-            margin: 0 0 10px 0;
-        }
-        .toggle-group-size {
-            margin-bottom: 10px;
-        }
-    </style>
+    <title>CSV グループ分けツール</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="container">
+        <h1>CSV グループ分けツール</h1>
 
-    <h1>グループ分けアプリ</h1>
+        <section id="file-section">
+            <h2>CSVファイルを選択</h2>
+            <input type="file" id="csv-files" accept=".csv" multiple>
+            <select id="csv-select">
+                <option value="">-- CSVファイルを選択 --</option>
+            </select>
+        </section>
 
-    <section>
-        <h2>1. CSVファイルをアップロード</h2>
-        <input type="file" id="csvFiles" accept=".csv" multiple>
-    </section>
+        <section id="table-section" class="hidden">
+            <h2>参加者一覧</h2>
+            <div class="table-wrapper">
+                <table id="participants-table">
+                    <thead>
+                        <tr>
+                            <th>名前</th>
+                            <th>性別</th>
+                            <th>欠席</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- データがここに挿入されます -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="save-attendance">欠席者を保存</button>
+        </section>
 
-    <section>
-        <h2>2. CSVファイルを選択</h2>
-        <select id="csvSelect">
-            <option value="">-- CSVファイルを選択 --</option>
-        </select>
-    </section>
+        <section id="order-section" class="hidden">
+            <h2>順番決め</h2>
+            <button id="decide-order">順番を決める</button>
+            <div class="table-wrapper hidden">
+                <table id="order-table">
+                    <thead>
+                        <tr>
+                            <th>順番</th>
+                            <th>名前</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 順番データがここに挿入されます -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <section>
-        <h2>3. 人員一覧</h2>
-        <table id="peopleTable">
-            <thead>
-                <tr>
-                    <th>名前</th>
-                    <th>性別</th>
-                    <th>欠席</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- データがここに挿入されます -->
-            </tbody>
-        </table>
-    </section>
-
-    <section>
-        <h2>4. 順番決め</h2>
-        <button id="decideOrderBtn">順番を決める</button>
-        <table id="orderTable" style="display:none;">
-            <thead>
-                <tr>
-                    <th>順番</th>
-                    <th>名前</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 順番がここに挿入されます -->
-            </tbody>
-        </table>
-    </section>
-
-    <section>
-        <h2>5. グループ分け</h2>
-        <div class="toggle-group-size">
-            <label>グループ数を選択:
-                <input type="number" id="groupCount" min="1" value="2">
-            </label>
-            <button id="generateGroupsBtn">グループを生成</button>
-        </div>
-        <div id="groupsContainer">
-            <!-- グループがここに表示されます -->
-        </div>
-    </section>
-
-    <script>
-        let allData = {}; // { filename: [{name: '', gender: '', absent: false}, ...], ... }
-
-        const csvFilesInput = document.getElementById('csvFiles');
-        const csvSelect = document.getElementById('csvSelect');
-        const peopleTableBody = document.querySelector('#peopleTable tbody');
-        const decideOrderBtn = document.getElementById('decideOrderBtn');
-        const orderTable = document.getElementById('orderTable');
-        const orderTableBody = document.querySelector('#orderTable tbody');
-        const generateGroupsBtn = document.getElementById('generateGroupsBtn');
-        const groupsContainer = document.getElementById('groupsContainer');
-        const groupCountInput = document.getElementById('groupCount');
-
-        // CSVファイルをアップロード
-        csvFilesInput.addEventListener('change', (e) => {
-            const files = e.target.files;
-            for (let file of files) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const text = event.target.result;
-                    const data = parseCSV(text);
-                    allData[file.name] = data;
-                    updateCSVSelect();
-                };
-                reader.readAsText(file);
-            }
-        });
-
-        // CSVファイル選択肢を更新
-        function updateCSVSelect() {
-            csvSelect.innerHTML = '<option value="">-- CSVファイルを選択 --</option>';
-            for (let filename in allData) {
-                const option = document.createElement('option');
-                option.value = filename;
-                option.textContent = filename;
-                csvSelect.appendChild(option);
-            }
-        }
-
-        // CSVファイルが選択されたときにテーブルを更新
-        csvSelect.addEventListener('change', () => {
-            const selectedFile = csvSelect.value;
-            if (selectedFile && allData[selectedFile]) {
-                displayPeople(allData[selectedFile]);
-            } else {
-                peopleTableBody.innerHTML = '';
-            }
-            orderTable.style.display = 'none';
-            groupsContainer.innerHTML = '';
-        });
-
-        // CSVパーサー
-        function parseCSV(text) {
-            const lines = text.trim().split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
-            const data = [];
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
-                const entry = {};
-                headers.forEach((header, index) => {
-                    entry[header] = values[index];
-                });
-                // 初期状態では欠席ではない
-                entry.absent = false;
-                data.push(entry);
-            }
-            return data;
-        }
-
-        // 人員一覧を表示
-        function displayPeople(data) {
-            peopleTableBody.innerHTML = '';
-            data.forEach((person, index) => {
-                const tr = document.createElement('tr');
-                if (person.absent) tr.classList.add('absent');
-
-                const nameTd = document.createElement('td');
-                nameTd.textContent = person.name || person['名前'] || 'Unnamed';
-                tr.appendChild(nameTd);
-
-                const genderTd = document.createElement('td');
-                genderTd.textContent = person.gender || person['性別'] || '不明';
-                tr.appendChild(genderTd);
-
-                const absentTd = document.createElement('td');
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = person.absent;
-                checkbox.addEventListener('change', () => {
-                    data[index].absent = checkbox.checked;
-                    if (checkbox.checked) {
-                        tr.classList.add('absent');
-                    } else {
-                        tr.classList.remove('absent');
-                    }
-                });
-                absentTd.appendChild(checkbox);
-                tr.appendChild(absentTd);
-
-                peopleTableBody.appendChild(tr);
-            });
-        }
-
-        // 順番決めボタンの機能
-        decideOrderBtn.addEventListener('click', () => {
-            const selectedFile = csvSelect.value;
-            if (!selectedFile) {
-                alert('CSVファイルを選択してください。');
-                return;
-            }
-            let data = allData[selectedFile].filter(person => !person.absent);
-            shuffleArray(data);
-            orderTableBody.innerHTML = '';
-            data.forEach((person, index) => {
-                const tr = document.createElement('tr');
-                const orderTd = document.createElement('td');
-                orderTd.textContent = index + 1;
-                tr.appendChild(orderTd);
-
-                const nameTd = document.createElement('td');
-                nameTd.textContent = person.name || person['名前'] || 'Unnamed';
-                tr.appendChild(nameTd);
-
-                orderTableBody.appendChild(tr);
-            });
-            orderTable.style.display = 'table';
-        });
-
-        // シャッフル関数（Fisher-Yatesアルゴリズム）
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-
-        // グループ生成ボタンの機能
-        generateGroupsBtn.addEventListener('click', () => {
-            const selectedFile = csvSelect.value;
-            if (!selectedFile) {
-                alert('CSVファイルを選択してください。');
-                return;
-            }
-            let data = allData[selectedFile].filter(person => !person.absent);
-            const groupCount = parseInt(groupCountInput.value);
-            if (isNaN(groupCount) || groupCount < 1) {
-                alert('有効なグループ数を入力してください。');
-                return;
-            }
-
-            // グループ分けのアルゴリズム
-            const groups = Array.from({length: groupCount}, () => []);
-            const girls = data.filter(person => {
-                const gender = person.gender || person['性別'] || '';
-                return gender === '女' || gender === '女性' || gender === 'F';
-            });
-            const boys = data.filter(person => {
-                const gender = person.gender || person['性別'] || '';
-                return gender === '男' || gender === '男性' || gender === 'M';
-            });
-
-            // できるだけ均等に分けるためにシャッフル
-            shuffleArray(girls);
-            shuffleArray(boys);
-
-            // 最初に男女交互にグループに割り当てる
-            let i = 0;
-            while (girls.length > 0 || boys.length > 0) {
-                if (girls.length > 0) {
-                    groups[i % groupCount].push(girls.pop());
-                }
-                if (boys.length > 0) {
-                    groups[i % groupCount].push(boys.pop());
-                }
-                i++;
-            }
-
-            // グループの性別バランスを確認し、調整
-            groups.forEach(group => {
-                const total = group.length;
-                const femaleCount = group.filter(person => {
-                    const gender = person.gender || person['性別'] || '';
-                    return gender === '女' || gender === '女性' || gender === 'F';
-                }).length;
-                if (femaleCount > Math.floor(total / 2)) {
-                    // バランスが悪い場合は他のグループと交換
-                    for (let otherGroup of groups) {
-                        if (otherGroup === group) continue;
-                        const otherFemales = otherGroup.filter(person => {
-                            const gender = person.gender || person['性別'] || '';
-                            return gender === '女' || gender === '女性' || gender === 'F';
-                        }).length;
-                        if (otherFemales < Math.floor(otherGroup.length / 2)) {
-                            // 交換可能な女性を探す
-                            const femaleToMove = group.find(person => {
-                                const gender = person.gender || person['性別'] || '';
-                                return gender === '女' || gender === '女性' || gender === 'F';
-                            });
-                            if (femaleToMove) {
-                                group.splice(group.indexOf(femaleToMove), 1);
-                                otherGroup.push(femaleToMove);
-                                break;
-                            }
-                        }
-                    }
-                }
-            });
-
-            // グループを表示
-            displayGroups(groups);
-        });
-
-        // グループを表示する関数
-        function displayGroups(groups) {
-            groupsContainer.innerHTML = '';
-            groups.forEach((group, index) => {
-                const groupDiv = document.createElement('div');
-                groupDiv.classList.add('group');
-
-                const groupTitle = document.createElement('h3');
-                groupTitle.textContent = `グループ ${index + 1}`;
-                groupDiv.appendChild(groupTitle);
-
-                const ul = document.createElement('ul');
-                group.forEach(person => {
-                    const li = document.createElement('li');
-                    li.textContent = person.name || person['名前'] || 'Unnamed';
-                    ul.appendChild(li);
-                });
-                groupDiv.appendChild(ul);
-
-                groupsContainer.appendChild(groupDiv);
-            });
-        }
-    </script>
-
+        <section id="group-section" class="hidden">
+            <h2>グループ分け</h2>
+            <div class="group-controls">
+                <label for="group-count">グループ数:</label>
+                <input type="number" id="group-count" min="1" value="2">
+                <button id="create-groups">グループを作成</button>
+            </div>
+            <div id="groups-display" class="groups-table-wrapper hidden">
+                <!-- グループ表示がここに挿入されます -->
+            </div>
+        </section>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>

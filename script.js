@@ -1,199 +1,302 @@
-// 参加者データを格納する配列
-let participants = [];
+document.addEventListener('DOMContentLoaded', () => {
+  const csvFilesInput = document.getElementById('csv-files');
+  const csvSelect = document.getElementById('csv-select');
+  const tableSection = document.getElementById('table-section');
+  const participantsTableBody = document.querySelector('#participants-table tbody');
+  const saveAttendanceBtn = document.getElementById('save-attendance');
+  const orderSection = document.getElementById('order-section');
+  const decideOrderBtn = document.getElementById('decide-order');
+  const orderTableWrapper = document.querySelector('#order-section .table-wrapper');
+  const orderTable = document.getElementById('order-table');
+  const orderTableBody = document.querySelector('#order-table tbody');
+  const groupSection = document.getElementById('group-section');
+  const createGroupsBtn = document.getElementById('create-groups');
+  const groupCountInput = document.getElementById('group-count');
+  const groupsDisplay = document.getElementById('groups-display');
+  const groupsTableWrapper = document.getElementById('groups-display');
 
-// 編集中の参加者のインデックス
-let editingIndex = null;
+  let allCSVData = {};
+  let currentData = [];
 
-// 参加者を追加または編集する関数
-function addOrEditParticipant() {
-    const nameInput = document.getElementById('name-input');
-    const genderInput = document.getElementById('gender-input');
+  // ファイル選択時
+  csvFilesInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      csvSelect.innerHTML = '<option value="">-- CSVファイルを選択 --</option>';
+      allCSVData = {};
+      currentData = [];
+      tableSection.classList.add('hidden');
+      orderSection.classList.add('hidden');
+      groupSection.classList.add('hidden');
+      groupsDisplay.innerHTML = '';
+      orderTableWrapper.classList.add('hidden');
+      orderTableBody.innerHTML = '';
+      participantsTableBody.innerHTML = '';
 
-    const name = nameInput.value.trim();
-    const gender = genderInput.value;
+      Array.from(files).forEach(file => {
+          const option = document.createElement('option');
+          option.value = file.name;
+          option.textContent = file.name;
+          csvSelect.appendChild(option);
 
-    if (name === '') {
-        alert('名前を入力してください。');
-        return;
-    }
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              const text = event.target.result;
+              const data = parseCSV(text);
+              allCSVData[file.name] = data;
+          };
+          reader.readAsText(file);
+      });
+  });
 
-    if (editingIndex !== null) {
-        // 編集モード
-        participants[editingIndex] = { name, gender };
-        editingIndex = null;
-        document.getElementById('add-button').textContent = '追加';
-    } else {
-        // 新規追加
-        participants.push({ name, gender });
-    }
+  // CSVファイル選択時
+  csvSelect.addEventListener('change', (e) => {
+      const selectedFile = e.target.value;
+      if (selectedFile && allCSVData[selectedFile]) {
+          currentData = [...allCSVData[selectedFile]]; // コピー
+          displayParticipants(currentData);
+          tableSection.classList.remove('hidden');
+          orderSection.classList.remove('hidden');
+          groupSection.classList.remove('hidden');
+          orderTableWrapper.classList.add('hidden');
+          orderTableBody.innerHTML = '';
+          groupsDisplay.innerHTML = '';
+          groupsTableWrapper.classList.add('hidden');
+      } else {
+          tableSection.classList.add('hidden');
+          orderSection.classList.add('hidden');
+          groupSection.classList.add('hidden');
+          groupsDisplay.innerHTML = '';
+          orderTableWrapper.classList.add('hidden');
+          orderTableBody.innerHTML = '';
+          participantsTableBody.innerHTML = '';
+      }
+  });
 
-    nameInput.value = '';
-    updateParticipantTable();
-}
+  // 欠席者保存
+  saveAttendanceBtn.addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll('.absent-checkbox');
+      currentData = currentData.filter((person, index) => {
+          const checkbox = checkboxes[index];
+          return checkbox && !checkbox.checked;
+      });
+      displayParticipants(currentData);
+  });
 
-// 参加者リストを更新する関数
-function updateParticipantTable() {
-    const tbody = document.querySelector('#participant-table tbody');
-    tbody.innerHTML = '';
+  // 順番決めボタン
+  decideOrderBtn.addEventListener('click', () => {
+      if (currentData.length === 0) {
+          alert('参加者がいません。');
+          return;
+      }
+      const shuffled = shuffleArray([...currentData]);
+      orderTableBody.innerHTML = '';
+      shuffled.forEach((person, index) => {
+          const tr = document.createElement('tr');
+          const tdOrder = document.createElement('td');
+          tdOrder.textContent = index + 1;
+          const tdName = document.createElement('td');
+          tdName.textContent = person.名前;
+          tr.appendChild(tdOrder);
+          tr.appendChild(tdName);
+          orderTableBody.appendChild(tr);
+      });
+      orderTableWrapper.classList.remove('hidden');
+  });
 
-    participants.forEach((participant, index) => {
-        const tr = document.createElement('tr');
-        const nameTd = document.createElement('td');
-        const genderTd = document.createElement('td');
-        const actionTd = document.createElement('td');
+  // グループ作成ボタン
+  createGroupsBtn.addEventListener('click', () => {
+      const groupCount = parseInt(groupCountInput.value);
+      if (isNaN(groupCount) || groupCount < 1) {
+          alert('有効なグループ数を入力してください。');
+          return;
+      }
+      if (currentData.length === 0) {
+          alert('参加者がいません。');
+          return;
+      }
+      if (groupCount > currentData.length) {
+          alert('グループ数が出席者数を超えています。グループ数を減らしてください。');
+          return;
+      }
+      const { groups, isBalanced } = createBalancedRandomGroups(currentData, groupCount);
+      if (!groups) {
+          return;
+      }
+      displayGroups(groups);
+  });
 
-        nameTd.textContent = participant.name;
-        genderTd.textContent = participant.gender === 'male' ? '男の子' : '女の子';
+  // CSVパース関数
+  function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      const data = [];
+      for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          const obj = {};
+          headers.forEach((header, index) => {
+              obj[header] = cols[index];
+          });
+          data.push(obj);
+      }
+      return data;
+  }
 
-        // 編集ボタン
-        const editButton = document.createElement('button');
-        editButton.textContent = '編集';
-        editButton.classList.add('edit-button');
-        editButton.addEventListener('click', () => editParticipant(index));
+  // 参加者テーブル表示関数
+  function displayParticipants(data) {
+      participantsTableBody.innerHTML = '';
+      data.forEach(person => {
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td');
+          tdName.textContent = person.名前;
+          const tdGender = document.createElement('td');
+          tdGender.textContent = person.性別;
+          const tdAbsent = document.createElement('td');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.classList.add('absent-checkbox');
+          tdAbsent.appendChild(checkbox);
+          tr.appendChild(tdName);
+          tr.appendChild(tdGender);
+          tr.appendChild(tdAbsent);
+          participantsTableBody.appendChild(tr);
+      });
+  }
 
-        // 削除ボタン
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = '削除';
-        deleteButton.classList.add('delete-button');
-        deleteButton.addEventListener('click', () => deleteParticipant(index));
+  // 配列シャッフル関数
+  function shuffleArray(array) {
+      for (let i = array.length -1; i >0; i--){
+          const j = Math.floor(Math.random() * (i +1));
+          [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+  }
 
-        actionTd.appendChild(editButton);
-        actionTd.appendChild(deleteButton);
+  // グループ作成関数（ランダムかつ性別バランスを考慮）
+  function createBalancedRandomGroups(data, groupCount) {
+      // シャッフル
+      const shuffled = shuffleArray([...data]);
 
-        tr.appendChild(nameTd);
-        tr.appendChild(genderTd);
-        tr.appendChild(actionTd);
-        tbody.appendChild(tr);
-    });
-}
+      // 性別ごとに分ける
+      const males = shuffled.filter(person => person.性別 === '男');
+      const females = shuffled.filter(person => person.性別 === '女');
 
-// 参加者を編集する関数
-function editParticipant(index) {
-    const participant = participants[index];
-    document.getElementById('name-input').value = participant.name;
-    document.getElementById('gender-input').value = participant.gender;
-    editingIndex = index;
-    document.getElementById('add-button').textContent = '更新';
-}
+      // 目標グループサイズ
+      const baseSize = Math.floor(shuffled.length / groupCount);
+      const extra = shuffled.length % groupCount;
 
-// 参加者を削除する関数
-function deleteParticipant(index) {
-    participants.splice(index, 1);
-    updateParticipantTable();
-}
+      // 初期グループ配列
+      const groups = Array.from({ length: groupCount }, () => []);
 
-// 順番を決める関数
-function decideOrder() {
-    const shuffled = [...participants];
-    shuffleArray(shuffled);
+      // グループごとの目標サイズ
+      const groupSizes = groups.map((_, index) => baseSize + (index < extra ? 1 : 0));
 
-    const orderTable = document.getElementById('order-table');
-    orderTable.innerHTML = '';
+      // 性別バランスを保つための目標女性数
+      const maxFemalesPerGroup = groupSizes.map(size => Math.floor(size / 2));
 
-    shuffled.forEach((participant, index) => {
-        const tr = document.createElement('tr');
-        const orderTd = document.createElement('td');
-        const nameTd = document.createElement('td');
-        const genderTd = document.createElement('td');
+      // 女性を均等に分配
+      const { femalesPerGroup, isBalanced } = distributeFemales(females, groupCount, maxFemalesPerGroup);
 
-        orderTd.textContent = index + 1;
-        nameTd.textContent = participant.name;
-        genderTd.textContent = participant.gender === 'male' ? '男の子' : '女の子';
+      // グループに女性を割り当て
+      femalesPerGroup.forEach((femaleList, groupIndex) => {
+          groups[groupIndex].push(...femaleList);
+      });
 
-        tr.appendChild(orderTd);
-        tr.appendChild(nameTd);
-        tr.appendChild(genderTd);
-        orderTable.appendChild(tr);
-    });
-}
+      // 残りの男性を均等に割り当て
+      const remainingMales = males.slice();
+      remainingMales.forEach((male, index) => {
+          const groupIndex = index % groupCount;
+          if (groups[groupIndex].length < groupSizes[groupIndex]) {
+              groups[groupIndex].push(male);
+          } else {
+              // グループが既に満員の場合、次のグループを探す
+              for (let i = 0; i < groupCount; i++) {
+                  const newGroupIndex = (groupIndex + i) % groupCount;
+                  if (groups[newGroupIndex].length < groupSizes[newGroupIndex]) {
+                      groups[newGroupIndex].push(male);
+                      break;
+                  }
+              }
+          }
+      });
 
-// 配列をシャッフルする関数
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
+      return { groups, isBalanced };
+  }
 
-// グループ分けをする関数
-function divideGroups() {
-    const groupNumberInput = document.getElementById('group-number');
-    const groupNumber = parseInt(groupNumberInput.value);
+  // 女性をグループに均等に分配する関数
+  function distributeFemales(females, groupCount, maxFemalesPerGroup) {
+      const femalesPerGroup = Array.from({ length: groupCount }, () => []);
+      let femaleIndex = 0;
+      let isBalanced = true;
 
-    if (groupNumber < 1) {
-        alert('グループの数は1以上にしてください。');
-        return;
-    }
+      // 最大許容数まで女性を各グループに分配
+      for (let i = 0; i < groupCount; i++) {
+          const target = maxFemalesPerGroup[i];
+          for (let j = 0; j < target && femaleIndex < females.length; j++) {
+              femalesPerGroup[i].push(females[femaleIndex++]);
+          }
+      }
 
-    const groupResultDiv = document.getElementById('group-result');
-    groupResultDiv.innerHTML = '';
+      // 残った女性を他のグループに追加
+      while (femaleIndex < females.length) {
+          let added = false;
+          for (let i = 0; i < groupCount; i++) {
+              if (femalesPerGroup[i].length < maxFemalesPerGroup[i] + 4) { // 1人超過を許容
+                  femalesPerGroup[i].push(females[femaleIndex++]);
+                  added = true;
+                  break;
+              }
+          }
+          if (!added) {
+              // さらに追加できない場合、バランスが崩れている
+              isBalanced = false;
+              break;
+          }
+      }
 
-    // 男性と女性を分ける
-    const males = participants.filter(p => p.gender === 'male');
-    const females = participants.filter(p => p.gender === 'female');
+      // バランスが崩れているかどうかを確認
+      for (let i = 0; i < groupCount; i++) {
+          if (femalesPerGroup[i].length > maxFemalesPerGroup[i]) {
+              isBalanced = false;
+              break;
+          }
+      }
 
-    // シャッフル
-    shuffleArray(males);
-    shuffleArray(females);
+      return { femalesPerGroup, isBalanced };
+  }
 
-    // グループ配列を作成
-    const groups = Array.from({ length: groupNumber }, () => []);
+  // グループ表示関数（テーブル形式）
+  function displayGroups(groups) {
+      groupsDisplay.innerHTML = '';
 
-    // 参加者をグループに割り当てる
-    let index = 0;
-    while (males.length > 0 || females.length > 0) {
-        const currentGroup = groups[index % groupNumber];
-        const maleCount = currentGroup.filter(p => p.gender === 'male').length;
-        const femaleCount = currentGroup.filter(p => p.gender === 'female').length;
+      groups.forEach((group, index) => {
+          const groupTable = document.createElement('table');
+          groupTable.classList.add('group-table');
 
-        // 女の子が半数以上にならないようにする
-        if (femaleCount < Math.floor((currentGroup.length + 1) / 2) && females.length > 0) {
-            currentGroup.push(females.pop());
-        } else if (males.length > 0) {
-            currentGroup.push(males.pop());
-        } else if (females.length > 0) {
-            currentGroup.push(females.pop());
-        }
-        index++;
-    }
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          const thGroup = document.createElement('th');
+          thGroup.textContent = `グループ ${index + 1} (${group.length}人)`;
+          thGroup.colSpan = 2;
+          headerRow.appendChild(thGroup);
+          thead.appendChild(headerRow);
+          groupTable.appendChild(thead);
 
-    // グループを表示
-    groups.forEach((group, index) => {
-        const groupDiv = document.createElement('div');
-        groupDiv.classList.add('group');
+          const tbody = document.createElement('tbody');
+          group.forEach(person => {
+              const tr = document.createElement('tr');
+              const tdName = document.createElement('td');
+              tdName.textContent = person.名前;
+              const tdGender = document.createElement('td');
+              tdGender.textContent = person.性別;
+              tr.appendChild(tdName);
+              tr.appendChild(tdGender);
+              tbody.appendChild(tr);
+          });
+          groupTable.appendChild(tbody);
 
-        const groupTitle = document.createElement('h3');
-        groupTitle.textContent = `グループ ${index + 1}`;
-        groupDiv.appendChild(groupTitle);
+          groupsDisplay.appendChild(groupTable);
+      });
 
-        const table = document.createElement('table');
-
-        group.forEach(participant => {
-            const tr = document.createElement('tr');
-            const nameTd = document.createElement('td');
-            const genderTd = document.createElement('td');
-
-            nameTd.textContent = participant.name;
-            genderTd.textContent = participant.gender === 'male' ? '男の子' : '女の子';
-
-            tr.appendChild(nameTd);
-            tr.appendChild(genderTd);
-            table.appendChild(tr);
-        });
-
-        groupDiv.appendChild(table);
-        groupResultDiv.appendChild(groupDiv);
-    });
-}
-
-// エンターキーで参加者を追加する機能
-document.getElementById('name-input').addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-        addOrEditParticipant();
-    }
+      groupsTableWrapper.classList.remove('hidden');
+  }
 });
-
-// イベントリスナーの設定
-document.getElementById('add-button').addEventListener('click', addOrEditParticipant);
-document.getElementById('decide-order-button').addEventListener('click', decideOrder);
-document.getElementById('divide-group-button').addEventListener('click', divideGroups);
